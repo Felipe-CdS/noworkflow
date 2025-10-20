@@ -17,6 +17,7 @@ import {json, makeid} from '@noworkflow/utils';
 
 import {TrialGraphWidget} from './trial_graph';
 import {DiffGraphWidget} from './diff_graph';
+import {ProspectiveGraphWidget} from './prospective_graph';
 import {NowVisPanel} from '../nowpanel';
 import {TrialInfoWidget} from '../info/trial_info';
 import {DiffInfoWidget} from '../info/diff_info';
@@ -222,6 +223,7 @@ class HistoryWidget extends Widget {
         },
         customSelectNode: (g: HistoryGraph, d: VisibleHistoryNode) => {
           let trialGraphWidget = new TrialGraphWidget("Trial " + d.display, "trial-" + d.title + makeid(), d.title, d.title);
+          let prospectiveGraphWidget = new ProspectiveGraphWidget("Prospective " + d.display, "prospective-" + d.title + makeid(), d.title);
           let parentDock: NowVisPanel = this.parent as NowVisPanel;
 
           if (this.config.showInfo()) {
@@ -236,6 +238,10 @@ class HistoryWidget extends Widget {
               this.config.graphType(),
               this.config.useCache()
             );
+
+            // Add prospective provenance graph
+            parentDock.addGraphWidget(prospectiveGraphWidget);
+            prospectiveGraphWidget.load();
           }
           return true;
         },
