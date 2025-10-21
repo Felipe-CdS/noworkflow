@@ -29,6 +29,33 @@ def _clean_node_id(first_line, comp_type, last_line):
 def generate_prospective_prov(trial):
     """Generate prospective provenance as Graphviz DOT format
 
+    TODO: This is a SIMPLIFIED implementation that generates sequential graphs.
+    For full prospective provenance with control flow, implement:
+
+    1. Migrate DefinitionProvenance.py logic:
+       - componentAnalyzer() method (line 714-772)
+       - syntaxRulesIF() - IF/ELSE branching with True/False labels
+       - syntaxRulesFOR() - Loop back-edges and end-loop edges
+       - syntaxRulesTRY() - Exception handling edges
+       - edge_Definition_and_Calls() - Function call -> definition edges
+
+    2. Add graph structures from GraphDrawer.py, SyntaxWrite.py:
+       - Function clustering (subgraph with dashed borders)
+       - Class clustering
+       - Loop variable annotations (note shapes)
+
+    3. Add control flow edges:
+       - IF True/False branches
+       - Loop back-edges (dashed)
+       - Loop exit edges (label="End Loop")
+       - Function call edges (dashed, pointing to function_def)
+
+    4. Filter and aggregate components properly:
+       - Group related components at statement level
+       - Track nesting with def_list, column tracking
+
+    Current implementation: Basic sequential graph with syntax filtering.
+
     Args:
         trial: Trial object with .id attribute
 
@@ -39,6 +66,28 @@ def generate_prospective_prov(trial):
     result = analyzer.analyze(filter_type='everything')
 
     components = result['components']
+
+    # QUICK FIX: Filter out granular components
+    # Keep only statement-level components, not internal tokens
+    keep_types = {
+        'script', 'import', 'import_from',
+        'function_def', 'class_def',
+        'assign', 'call', 'return',
+        'for', 'while', 'if', 'elif',
+        'try', 'exception',
+    }
+
+    filtered = []
+    for comp in components:
+        first_line, last_line, comp_type, name, column = comp
+        # Filter out: syntax tokens, names/literals within expressions
+        if comp_type in keep_types:
+            filtered.append(comp)
+        elif comp_type == 'syntax' and name in ['else:', 'finally:']:
+            # Keep else/finally as separate nodes
+            filtered.append(comp)
+
+    components = filtered
 
     lines = ['strict digraph {']
     lines.append('    node [color=black fillcolor="#85CBC0" shape=box style=filled]')
@@ -55,12 +104,16 @@ def generate_prospective_prov(trial):
         name_str = name[:50] if name else comp_type
         label = _escape_dot_string(f"{first_line}: {name_str}")
 
-        if comp_type in ['import', 'name']:
+        # TODO: Color should match prospective-prov scheme:
+        # - #976BAA for assigns/variables
+        # - #85CBC0 for calls/returns/imports
+        # - white for loop annotations
+        if comp_type in ['assign']:
             color = '#976BAA'
         else:
             color = '#85CBC0'
 
-        if comp_type in ['for', 'while', 'if']:
+        if comp_type in ['for', 'while', 'if', 'elif']:
             shape = 'ellipse'
         else:
             shape = 'box'
