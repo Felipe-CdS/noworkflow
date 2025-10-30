@@ -21,11 +21,18 @@ class ExperimentDataCollector:
 
     @property
     def trial_check(self):
-        """Check if trial exists and is finished"""
-        trial = Trial.load_trial(self.trial_id, self.session)
-        if trial and trial.status == "finished":
-            return True
-        else:
+        """Check if trial exists"""
+        try:
+            trial = Trial(trial_ref=self.trial_id)
+            # Check if trial exists - prospective provenance is about script structure,
+            # so we don't require the trial to be "finished"
+            if trial.id:
+                return True
+            else:
+                print(f"Trial {self.trial_id} not found")
+                return False
+        except Exception as e:
+            print(f"Error loading trial {self.trial_id}: {e}")
             print("Something is wrong! Maybe the trial is not available in noWorkflow!")
             print("Try running the trial again in noWorkflow!")
             return False

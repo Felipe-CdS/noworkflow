@@ -22,7 +22,7 @@ class ProspectiveAnalyzer:
     def analyze(self, filter_type='everything', **options):
         """Generate prospective provenance"""
         if not self.collector.trial_check:
-            raise ValueError(f"Trial {self.trial_id} not found or not finished")
+            raise ValueError(f"Trial {self.trial_id} not found")
 
         config = self._build_config(filter_type, **options)
 

@@ -18,6 +18,10 @@ export class ProspectiveGraphWidget extends Widget {
   d3node: d3_Selection<d3_BaseType, {}, HTMLElement | null, any>;
   dotContent: string | null;
 
+  static url(trialId: string): string {
+    return `trials/${trialId}/prospective.dot`;
+  }
+
   constructor(name: string, cls: string, trialId: string) {
     super({ node: ProspectiveGraphWidget.createNode(cls) });
     this.d3node = d3_select(this.node);
@@ -79,38 +83,56 @@ export class ProspectiveGraphWidget extends Widget {
   load() {
     let contentDiv = this.node.getElementsByClassName("prospective-content")[0];
 
-    // Static DOT content as placeholder (from demo_test/demo_1)
-    const staticDotContent = this.getStaticDotContent();
+    // Show loading state
+    contentDiv.innerHTML = `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px;">
+        <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
+        <p style="margin-top: 20px; color: #666;">Loading prospective provenance for trial ${this.trialId}...</p>
+        <style>
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        </style>
+      </div>
+    `;
 
-    this.dotContent = staticDotContent;
-    this.renderGraph(staticDotContent, contentDiv);
-  }
+    // Fetch DOT content from backend
+    const url = ProspectiveGraphWidget.url(this.trialId);
 
-  getStaticDotContent(): string {
-    // Static prospective provenance graph for demonstration
-    return `
-	strict digraph {
-	    node [color=black fillcolor="#85CBC0" shape=box style=filled]
-	    nodesep=0.4 size=15
-
-	    start [label=Start]
-	    node_1_script_6 [label="1: main.py" fillcolor="#85CBC0" shape=box]
-	    start -> node_1_script_6
-	    node_1_assign_1 [label="1: y = 10" fillcolor="#976BAA" shape=box]
-	    node_1_script_6 -> node_1_assign_1
-	    node_2_assign_2 [label="2: k = 40" fillcolor="#976BAA" shape=box]
-	    node_1_assign_1 -> node_2_assign_2
-	    node_4_for_5 [label="4: for i in range(10):\n    y = i + 1" fillcolor="#85CBC0" shape=ellipse]
-	    node_2_assign_2 -> node_4_for_5
-	    node_4_call_4 [label="4: range(10)" fillcolor="#85CBC0" shape=box]
-	    node_4_for_5 -> node_4_call_4
-	    node_5_assign_5 [label="5: y = i + 1" fillcolor="#976BAA" shape=box]
-	    node_4_call_4 -> node_5_assign_5
-
-	    end [label=End]
-	    node_5_assign_5 -> end
-	}
-`;
+    fetch(url)
+      .then((response) => {
+        if (!response.ok) {
+          return response.text().then((errorText) => {
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+          });
+        }
+        return response.text();
+      })
+      .then((dotContent) => {
+        console.log("Successfully fetched prospective provenance DOT");
+        this.dotContent = dotContent;
+        this.renderGraph(dotContent, contentDiv);
+      })
+      .catch((error) => {
+        console.error("Error fetching prospective provenance:", error);
+        // Show error message in graph area
+        contentDiv.innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px; text-align: center;">
+            <i class="fa fa-exclamation-triangle" style="font-size: 48px; color: #e74c3c; margin-bottom: 20px;"></i>
+            <h3 style="color: #e74c3c; margin: 0 0 10px 0;">Failed to Load Prospective Provenance</h3>
+            <p style="color: #666; margin: 0 0 10px 0; max-width: 500px;">
+              Could not fetch prospective provenance for trial <code>${this.trialId}</code>
+            </p>
+            <p style="color: #999; margin: 0; font-size: 0.9em; max-width: 500px;">
+              ${error.message}
+            </p>
+            <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Reload Page
+            </button>
+          </div>
+        `;
+      });
   }
 
   renderGraph(dotContent: string, container: Element) {
