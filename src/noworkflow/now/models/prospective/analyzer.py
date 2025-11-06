@@ -78,3 +78,32 @@ class ProspectiveAnalyzer:
     def get_function_calls(self):
         """Get all function calls in the trial"""
         return self.collector.return_calls
+
+    def generate_graph(self, **options):
+        """Generate full prospective provenance control-flow graph
+
+        Args:
+            **options: Optional configuration
+                - activations: Include execution activations
+                - checkpoints: Include execution timing
+                - contents: Include variable contents
+                - indented: Show indentation levels
+
+        Returns:
+            Graphviz Digraph object with complete control-flow graph
+        """
+        from .modules.provenance.definition import DefinitionProvenanceAnalyzer
+
+        if not self.collector.trial_check:
+            raise ValueError(f"Trial {self.trial_id} not found")
+
+        config = self._build_config('everything', **options)
+        components = self.collector.code_components(config)
+
+        if not components:
+            raise ValueError("No code components found")
+
+        analyzer = DefinitionProvenanceAnalyzer(self.trial_id)
+        analyzer.component_analyzer(self.collector, components, config)
+
+        return analyzer.provenance

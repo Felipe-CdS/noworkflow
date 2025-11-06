@@ -43,9 +43,32 @@ export class ProspectiveGraphWidget extends Widget {
     let node = document.createElement("div");
     let d3node = d3_select(node);
 
-    d3node.append("div").classed("prospective-toolbar", true);
+    // Set up container to take full space
+    node.style.display = "flex";
+    node.style.flexDirection = "column";
+    node.style.width = "100%";
+    node.style.height = "100%";
+    node.style.overflow = "hidden";
 
-    d3node.append("div").classed("prospective-content", true);
+    d3node.append("div")
+      .classed("prospective-toolbar", true)
+      .style("flex-shrink", "0")
+      .style("height", "30px")
+      .style("min-height", "30px")
+      .style("max-height", "30px")
+      .style("padding", "2px 5px")
+      .style("background", "#f5f5f5")
+      .style("border-bottom", "1px solid #ddd")
+      .style("display", "flex")
+      .style("align-items", "center")
+      .style("gap", "8px");
+
+    d3node.append("div")
+      .classed("prospective-content", true)
+      .style("flex", "1")
+      .style("min-height", "0")
+      .style("overflow", "hidden")
+      .style("position", "relative");
 
     return node;
   }
@@ -59,7 +82,10 @@ export class ProspectiveGraphWidget extends Widget {
       .classed("toollink", true)
       .attr("href", "#")
       .attr("title", "Download graph SVG")
-      .style("margin-right", "10px")
+      .style("padding", "4px 8px")
+      .style("text-decoration", "none")
+      .style("color", "#333")
+      .style("font-size", "14px")
       .on("click", () => {
         this.downloadSVG();
       })
@@ -72,7 +98,10 @@ export class ProspectiveGraphWidget extends Widget {
       .classed("toollink", true)
       .attr("href", "#")
       .attr("title", "Download graph DOT")
-      .style("margin-right", "10px")
+      .style("padding", "4px 8px")
+      .style("text-decoration", "none")
+      .style("color", "#333")
+      .style("font-size", "14px")
       .on("click", () => {
         this.downloadDOT();
       })
@@ -156,10 +185,35 @@ export class ProspectiveGraphWidget extends Widget {
           (container as HTMLElement).clientHeight,
         );
 
-        // Set explicit dimensions on container if needed
-        (container as HTMLElement).style.width = "100%";
-        (container as HTMLElement).style.height = "100%";
-        (container as HTMLElement).style.overflow = "hidden";
+        // Apply initial zoom by adjusting viewBox
+        const viewBoxAttr = svgElement.getAttribute("viewBox");
+        if (viewBoxAttr) {
+          const values = viewBoxAttr.split(" ").map(parseFloat);
+          const x = values[0];
+          const y = values[1];
+          const width = values[2];
+          const height = values[3];
+
+          // Zoom in by reducing viewBox dimensions (50% = 2x zoom)
+          const zoomFactor = 0.6; // 0.6 = ~1.67x zoom (adjust between 0.5-0.8)
+          const newWidth = width * zoomFactor;
+          const newHeight = height * zoomFactor;
+
+          // Center the zoomed view
+          const newX = x + (width - newWidth) / 2;
+          const newY = y + (height - newHeight) / 2;
+
+          svgElement.setAttribute("viewBox", `${newX} ${newY} ${newWidth} ${newHeight}`);
+          console.log("Applied initial zoom, new viewBox:", svgElement.getAttribute("viewBox"));
+        }
+
+        // Style SVG to fill container completely
+        svgElement.style.width = "100%";
+        svgElement.style.height = "100%";
+        svgElement.style.display = "block";
+        svgElement.style.position = "absolute";
+        svgElement.style.top = "0";
+        svgElement.style.left = "0";
 
         container.appendChild(svgElement);
         console.log("SVG appended to container");
@@ -264,6 +318,8 @@ export class ProspectiveGraphWidget extends Widget {
   }
 
   protected onResize(msg: Widget.ResizeMessage): void {
-    // Handle resize if needed
+    // Resize is handled automatically via flexbox layout
+    // SVG uses 100% width/height with position: absolute
+    // No manual intervention needed
   }
 }
