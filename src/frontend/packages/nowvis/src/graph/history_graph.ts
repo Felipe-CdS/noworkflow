@@ -223,7 +223,6 @@ class HistoryWidget extends Widget {
         },
         customSelectNode: (g: HistoryGraph, d: VisibleHistoryNode) => {
           let trialGraphWidget = new TrialGraphWidget("Trial " + d.display, "trial-" + d.title + makeid(), d.title, d.title);
-          let prospectiveGraphWidget = new ProspectiveGraphWidget("Prospective " + d.display, "prospective-" + d.title + makeid(), d.title);
           let parentDock: NowVisPanel = this.parent as NowVisPanel;
 
           if (this.config.showInfo()) {
@@ -238,10 +237,6 @@ class HistoryWidget extends Widget {
               this.config.graphType(),
               this.config.useCache()
             );
-
-            // Add prospective provenance graph
-            parentDock.addGraphWidget(prospectiveGraphWidget);
-            prospectiveGraphWidget.load();
           }
           return true;
         },
@@ -392,6 +387,7 @@ class HistoryWidget extends Widget {
     this.buildRestoreTrialCommand(this.modal, this.modalBody);
     this.buildRestoreFileCommand(this.modal, this.modalBody);
     this.buildProvCommand();
+    this.buildProspectiveCommand();
     this.buildExportPrologCommand(this.modal, this.modalBody)
     this.buildDataflowCommand(this.modal, this.modalBody)
     this.buildTrialFunctionDiffCommand(this.modal, this.modalBody, this.functionDiffWindow)
@@ -453,6 +449,33 @@ class HistoryWidget extends Widget {
 
         buildExportPrologModal(modal, modalBody, exportUrl, self.graph.config, parent, exportWindowId, trialId);
 
+      });
+  }
+
+  buildProspectiveCommand() {
+    let self = this;
+    this.rightClickMenu.append("a")
+      .classed("dropdown-item", true)
+      .attr("href", "#")
+      .attr("id", "prospective-option")
+      .text("open prospective graph")
+      .on("click", function () {
+        let parent = this.parentNode as Element;
+        let trialId = parent.getAttribute("selected-trial");
+        let trialDisplay = parent.getAttribute("selected-trial-simplified");
+
+        if (!trialId) return;
+
+        let prospectiveGraphWidget = new ProspectiveGraphWidget(
+          "Prospective " + trialDisplay,
+          "prospective-" + trialId + makeid(),
+          trialId
+        );
+        let parentDock: NowVisPanel = self.parent as NowVisPanel;
+
+        parentDock.addGraphWidget(prospectiveGraphWidget);
+        parentDock.activateWidget(prospectiveGraphWidget);
+        prospectiveGraphWidget.load();
       });
   }
 
