@@ -17,6 +17,8 @@ export class ProspectiveGraphWidget extends Widget {
   trialId: string;
   d3node: d3_Selection<d3_BaseType, {}, HTMLElement | null, any>;
   dotContent: string | null;
+  currentZoom: number;
+  originalViewBox: { x: number; y: number; width: number; height: number } | null;
 
   static url(trialId: string): string {
     return `trials/${trialId}/prospective.dot`;
@@ -34,6 +36,8 @@ export class ProspectiveGraphWidget extends Widget {
     this.cls = cls;
     this.trialId = trialId;
     this.dotContent = null;
+    this.currentZoom = 1.0;
+    this.originalViewBox = null;
 
     // Add toolbar
     this.createToolbar();
@@ -75,6 +79,40 @@ export class ProspectiveGraphWidget extends Widget {
 
   createToolbar() {
     let toolbar = this.d3node.select(".prospective-toolbar");
+
+    // Zoom In button
+    toolbar
+      .append("a")
+      .classed("toollink", true)
+      .attr("href", "#")
+      .attr("title", "Zoom In")
+      .style("padding", "4px 8px")
+      .style("text-decoration", "none")
+      .style("color", "#333")
+      .style("font-size", "14px")
+      .on("click", (event: Event) => {
+        event.preventDefault();
+        this.zoomIn();
+      })
+      .append("i")
+      .classed("fa fa-search-plus", true);
+
+    // Zoom Out button
+    toolbar
+      .append("a")
+      .classed("toollink", true)
+      .attr("href", "#")
+      .attr("title", "Zoom Out")
+      .style("padding", "4px 8px")
+      .style("text-decoration", "none")
+      .style("color", "#333")
+      .style("font-size", "14px")
+      .on("click", (event: Event) => {
+        event.preventDefault();
+        this.zoomOut();
+      })
+      .append("i")
+      .classed("fa fa-search-minus", true);
 
     // Download SVG button
     toolbar
@@ -185,23 +223,24 @@ export class ProspectiveGraphWidget extends Widget {
           (container as HTMLElement).clientHeight,
         );
 
-        // Apply initial zoom by adjusting viewBox
+        // Store original viewBox before any transformations
         const viewBoxAttr = svgElement.getAttribute("viewBox");
         if (viewBoxAttr) {
           const values = viewBoxAttr.split(" ").map(parseFloat);
-          const x = values[0];
-          const y = values[1];
-          const width = values[2];
-          const height = values[3];
+          this.originalViewBox = {
+            x: values[0],
+            y: values[1],
+            width: values[2],
+            height: values[3]
+          };
 
-          // Zoom in by reducing viewBox dimensions (50% = 2x zoom)
-          const zoomFactor = 0.6; // 0.6 = ~1.67x zoom (adjust between 0.5-0.8)
-          const newWidth = width * zoomFactor;
-          const newHeight = height * zoomFactor;
+          // Apply initial zoom by adjusting viewBox
+          const zoomFactor = 0.6;
+          const newWidth = this.originalViewBox.width * zoomFactor;
+          const newHeight = this.originalViewBox.height * zoomFactor;
 
-          // Center the zoomed view
-          const newX = x + (width - newWidth) / 2;
-          const newY = y + (height - newHeight) / 2;
+          const newX = this.originalViewBox.x + (this.originalViewBox.width - newWidth) / 2;
+          const newY = this.originalViewBox.y + (this.originalViewBox.height - newHeight) / 2;
 
           svgElement.setAttribute("viewBox", `${newX} ${newY} ${newWidth} ${newHeight}`);
           console.log("Applied initial zoom, new viewBox:", svgElement.getAttribute("viewBox"));
@@ -230,40 +269,20 @@ export class ProspectiveGraphWidget extends Widget {
   addPanFunctionality(svgElement: SVGSVGElement) {
     let isPanning = false;
     let startPoint = { x: 0, y: 0 };
-    let endPoint = { x: 0, y: 0 };
-    let viewBox = { x: 0, y: 0, width: 0, height: 0 };
-
-    // Get initial viewBox
-    const viewBoxAttr = svgElement.getAttribute("viewBox");
-    if (viewBoxAttr) {
-      const values = viewBoxAttr.split(" ").map(parseFloat);
-      viewBox = {
-        x: values[0],
-        y: values[1],
-        width: values[2],
-        height: values[3],
-      };
-    } else {
-      // If no viewBox, create one from SVG dimensions
-      const bbox = svgElement.getBBox();
-      viewBox = {
-        x: bbox.x,
-        y: bbox.y,
-        width: bbox.width,
-        height: bbox.height,
-      };
-      svgElement.setAttribute(
-        "viewBox",
-        `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`,
-      );
-    }
+    let startViewBox = { x: 0, y: 0 };
 
     svgElement.style.cursor = "grab";
 
     svgElement.addEventListener("mousedown", (e: MouseEvent) => {
       isPanning = true;
       startPoint = { x: e.clientX, y: e.clientY };
-      endPoint = { x: viewBox.x, y: viewBox.y };
+
+      const viewBoxAttr = svgElement.getAttribute("viewBox");
+      if (viewBoxAttr) {
+        const values = viewBoxAttr.split(" ").map(parseFloat);
+        startViewBox = { x: values[0], y: values[1] };
+      }
+
       svgElement.style.cursor = "grabbing";
       e.preventDefault();
     });
@@ -271,18 +290,20 @@ export class ProspectiveGraphWidget extends Widget {
     svgElement.addEventListener("mousemove", (e: MouseEvent) => {
       if (!isPanning) return;
 
-      const dx =
-        (e.clientX - startPoint.x) * (viewBox.width / svgElement.clientWidth);
-      const dy =
-        (e.clientY - startPoint.y) * (viewBox.height / svgElement.clientHeight);
+      const viewBoxAttr = svgElement.getAttribute("viewBox");
+      if (!viewBoxAttr) return;
 
-      viewBox.x = endPoint.x - dx;
-      viewBox.y = endPoint.y - dy;
+      const values = viewBoxAttr.split(" ").map(parseFloat);
+      const width = values[2];
+      const height = values[3];
 
-      svgElement.setAttribute(
-        "viewBox",
-        `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`,
-      );
+      const dx = (e.clientX - startPoint.x) * (width / svgElement.clientWidth);
+      const dy = (e.clientY - startPoint.y) * (height / svgElement.clientHeight);
+
+      const newX = startViewBox.x - dx;
+      const newY = startViewBox.y - dy;
+
+      svgElement.setAttribute("viewBox", `${newX} ${newY} ${width} ${height}`);
     });
 
     svgElement.addEventListener("mouseup", () => {
@@ -315,6 +336,41 @@ export class ProspectiveGraphWidget extends Widget {
         "prospective_" + this.trialId + ".dot",
       );
     }
+  }
+
+  zoomIn() {
+    this.applyZoom(1.2);
+  }
+
+  zoomOut() {
+    this.applyZoom(0.8);
+  }
+
+  applyZoom(factor: number) {
+    const svgElement = this.node.querySelector("svg");
+    if (!svgElement || !this.originalViewBox) return;
+
+    const viewBoxAttr = svgElement.getAttribute("viewBox");
+    if (!viewBoxAttr) return;
+
+    const values = viewBoxAttr.split(" ").map(parseFloat);
+    const currentX = values[0];
+    const currentY = values[1];
+    const currentWidth = values[2];
+    const currentHeight = values[3];
+
+    this.currentZoom *= factor;
+
+    const newWidth = currentWidth / factor;
+    const newHeight = currentHeight / factor;
+
+    const centerX = currentX + currentWidth / 2;
+    const centerY = currentY + currentHeight / 2;
+
+    const newX = centerX - newWidth / 2;
+    const newY = centerY - newHeight / 2;
+
+    svgElement.setAttribute("viewBox", `${newX} ${newY} ${newWidth} ${newHeight}`);
   }
 
   protected onResize(msg: Widget.ResizeMessage): void {
