@@ -3,7 +3,7 @@
 # This file is part of noWorkflow.
 # Please, consult the license terms in the LICENSE file.
 """Variable tagging"""
-from __future__ import absolute_import, print_function, division, unicode_literals
+from __future__ import annotations
 
 from noworkflow.now.models.dependency_querier.querier_options import QuerierOptions
 from noworkflow.now.models.dependency_querier import DependencyQuerier
@@ -12,11 +12,12 @@ from noworkflow.now.persistence.models.base import proxy_gen
 from noworkflow.now.persistence.models import Evaluation, CodeComponent
 from noworkflow.now.persistence import relational
 
-from typing import Dict, Optional, Tuple
-from IPython.display import HTML
-from pandas import DataFrame
+from typing import Dict, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from pandas import DataFrame
+
 import difflib
-import numpy
 import shelve
 import textwrap
 
@@ -195,7 +196,9 @@ def now_tag_variable(var_name, value):
 
     tagged_var_dict[name] = [dep_evaluation.id, value, activation_id, trial_id]
 
-    print(dep_evaluation)
+    # Force collection of evaluation value when there is a tag
+    dep_evaluation.repr = __noworkflow__.metascript.serialize(value) 
+    #print(dep_evaluation)
     # Writing it	  # Writing it
     __noworkflow__.stage_tags.add(trial_id, name, value, activation_id)
 
@@ -395,6 +398,7 @@ def trial_diff(trial_a: str, trial_b: str, raw: bool = False):
     if raw:
         return dict1, dict2
     else:
+        from IPython.display import HTML
         plain_text_a = dict_to_text(dict1)
         plain_text_b = dict_to_text(dict2)
 
@@ -497,7 +501,7 @@ def var_tag_values(tag_name: str) -> DataFrame:
             - 'tag': The name of the tag.
             - 'value': The value attributed to the tag in float format.
     """
-
+    import pandas as pd
     access_list = list(
         proxy_gen(
             relational.session.query(StageTags.m).filter(StageTags.m.name == tag_name)
@@ -517,7 +521,7 @@ def var_tag_values(tag_name: str) -> DataFrame:
                
         values_list.append([i.trial_id, i.trial_id[-5:], i.name, temp_value])
 
-    df = DataFrame(values_list, columns=["trial_id", "short_trial_id", "tag", "value"])
+    df = pd.DataFrame(values_list, columns=["trial_id", "short_trial_id", "tag", "value"])
     return df
 
 
@@ -551,6 +555,7 @@ def trial_intersection_diff(trial_a: str, trial_b: str) -> DataFrame:
     Example:
         df = trial_intersection_diff('trial_12345', 'trial_67890')
     """
+    import pandas as pd
     # Retrieve the ops dictionary from the shelve file
     try:
         with shelve.open("ops") as shelf:
@@ -573,6 +578,6 @@ def trial_intersection_diff(trial_a: str, trial_b: str) -> DataFrame:
     ]
 
     # Create a pandas DataFrame from the list of dictionaries
-    df = DataFrame(common_data)
+    df = pd.DataFrame(common_data)
 
     return df

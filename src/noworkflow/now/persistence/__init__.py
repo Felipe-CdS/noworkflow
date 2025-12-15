@@ -17,13 +17,17 @@ relational = RelationalDatabase(persistence_config)                             
 
 def get_serializer(arg):                                                         # pylint: disable=unused-argument
     """Select serializer according to argument"""
-    # ToDo #54: use arg to select serialize
-    # from .serializers import jsonpickle_serializer, jsonpickle_content
-    # from .serializers import SimpleSerializer
-    # return SimpleSerializer().serialize
-    # return jsonpickle_serializer
-    # return jsonpickle_content
-    return repr
+    from .serializers import jsonpickle_serializer, jsonpickle_content
+    from .serializers import repr_serializer, SimpleSerializer
+    if arg.serializer == "jsonpickle_content":
+        return jsonpickle_content
+    elif arg.serializer == "jsonpickle":
+        return jsonpickle_serializer
+    elif arg.serializer == "simple":
+        return SimpleSerializer().serialize
+    
+    # else: # arg.serializer == "repr":
+    return repr_serializer
 
 
 __all__ = [

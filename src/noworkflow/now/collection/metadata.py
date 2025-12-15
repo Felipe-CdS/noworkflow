@@ -14,6 +14,7 @@ from argparse import Namespace
 from datetime import datetime
 
 from future.utils import viewitems
+from noworkflow.now.persistence.serializers import repr_serializer
 
 from ..persistence import persistence_config, get_serializer, content
 from ..persistence.lightweight import ObjectStore, SharedObjectStore
@@ -43,6 +44,16 @@ CONTEXTS = {
     "main": MAIN,
     "package": PACKAGE,
     "all": ALL
+}
+
+NO_VALUES = 0
+RELEVANT_VALUES = 1
+ALL_VALUES = 2
+
+COLLECT_VALUES = {
+    "none": NO_VALUES,
+    "relevant": RELEVANT_VALUES,
+    "all": ALL_VALUES
 }
 
 
@@ -82,7 +93,9 @@ class Metascript(object):                                                       
         # Argv : list(str)
         self.argv = []
         # Object Serialize function : callable
-        self.serialize = repr
+        self.serialize = repr_serializer
+        # Collect values from evaluations
+        self.collect_values = ALL_VALUES
         # Trial command : str
         self.command = ""
         # Main id : int
@@ -197,7 +210,6 @@ class Metascript(object):                                                       
         self.name = args.name or os.path.basename(filename)
         self._read_args(args)
         self.path = filename
-        self.context = args.context
         return self
 
     def read_jupyter_args(self):
@@ -215,18 +227,19 @@ class Metascript(object):                                                       
             save_frequency=0,
             call_storage_frequency=10000,
             context="main",
+            serializer="repr",
+            collect_values="all",
             message=None,
             content_engine=None,
         )
         self._read_args(args)
         self.path = os.getcwd()
-        self.context = args.context
         return self
 
     def _read_args(self, args):
         """Read cmd line argument object"""
-        # ToDo #54: add serializer param
         self.serialize = get_serializer(args)
+        self.collect_values = COLLECT_VALUES[args.collect_values]
         self.verbose = args.verbose
         self.meta = args.meta
 
@@ -238,6 +251,8 @@ class Metascript(object):                                                       
         self.call_storage_frequency = args.call_storage_frequency
         self.message = args.message
         self.content_engine = persistence_config.content_engine = args.content_engine
+        self.context = args.context
+        self.execution.collector.reload_metascript(self)
         io.print_msg("setting up local provenance store")
         persistence_config.connect(self.dir)
         return self

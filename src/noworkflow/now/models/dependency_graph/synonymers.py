@@ -44,6 +44,8 @@ class SameSynonymer(Synonymer):
             if assignment_evaluation is not None:
                 synonym = EvaluationNode(assignment_evaluation)
                 self.synonym_ids[node.node_id] = synonym.node_id
+                if synonym.value is None:
+                    synonym.value = node.value
                 return synonym
         return node
 
@@ -66,6 +68,8 @@ class ReferenceSynonymer(Synonymer):
             if reference_evaluation is not None:
                 synonym = EvaluationNode(reference_evaluation)
                 self.synonym_ids[node.node_id] = synonym.node_id
+                if synonym.value is None:
+                    synonym.value = node.value
                 return synonym
         return node
 

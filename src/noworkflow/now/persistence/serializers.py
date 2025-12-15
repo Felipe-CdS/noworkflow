@@ -10,18 +10,35 @@ from __future__ import (absolute_import, print_function,
 from array import array
 from collections import deque
 
-from future.utils import viewitems
-
 from ..utils.cross_version import IMMUTABLE
 
 from . import content
+
+
+def repr_serializer(value):
+    """Get value representation from value"""
+    repr_fn = repr
+    if type(value) is not type:
+        try:
+            the_repr = object.__getattribute__(value, '__repr__')
+            original_def = getattr(the_repr, 'original_def')
+            repr_fn = original_def
+        except AttributeError:
+            pass
+    return repr_fn(value)
+
+
+def jsonpickle_serializer(obj):
+    """Use jsonpickle to get objects representation"""
+    import jsonpickle
+    return jsonpickle.encode(obj, keys=True)
 
 
 def jsonpickle_content(obj):
     """Use jsonpickle to get objects representation
     Store representation in the content database"""
     import jsonpickle
-    return "now-content:" + content.put(jsonpickle.encode(obj), "generic")
+    return "now-content:" + content.put(jsonpickle.encode(obj, keys=True), "generic")
 
 
 class SimpleSerializer(object):                                                  # pylint: disable=too-few-public-methods
@@ -79,7 +96,7 @@ class SimpleSerializer(object):                                                 
                 "({}, {})".format(
                     self.serialize(key, maxlevel - 1),
                     self.serialize(value, maxlevel - 1)
-                ) for key, value in viewitems(obj))
+                ) for key, value in obj.items())
 
         if not typ:
             return self._default(obj)

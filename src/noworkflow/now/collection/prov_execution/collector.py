@@ -78,34 +78,12 @@ class Collector(object):
             self.metascript = metascript
         else:
             self.metascript = weakref.proxy(metascript)
-        self.get_time = metascript.get_time
-
+            
         self.trial_id = -1  # It should be updated
-
-        self.code_components = self.metascript.code_components_store
-        self.evaluations = self.metascript.evaluations_store
-        self.activations = self.metascript.activations_store
-        self.dependencies = self.metascript.dependencies_store
-        self.members = self.metascript.members_store
-        self.file_accesses = self.metascript.file_accesses_store
-        self.stage_tags = self.metascript.stage_tags_store
-
-        self.exceptions = self.metascript.exceptions_store
-        # Partial save
-        self.partial_save_frequency = None
-        if metascript.save_frequency:  # milliseconds
-            self.partial_save_frequency = metascript.save_frequency / 1000.0
-        self.last_partial_save = self.get_time()
-
-        self.first_activation = self.activations.dry_add(
-            self.evaluations.dry_add(self.trial_id, -1, -1, None, None),
-            self.trial_id, "<now>", None, None
-        )
-        self.first_activation.depth = 0
-        self.last_activation = self.first_activation
+        
         self.future_activation = []
         self.shared_types = {}
-
+        
         # Original globals
         self.globals = copy(__builtins__)
         self.global_evaluations = {}
@@ -125,19 +103,59 @@ class Collector(object):
         # IPython Kernel History
         self.ipcell = 0
         self.iphistory = {}
+        
+        self.get_time = None  # type: Callable[[], float]
+        self.code_components = None  # type: ObjectStore
+        self.evaluations = None  # type: ObjectStore
+        self.activations = None  # type: SharedObjectStore
+        self.dependencies = None  # type: ObjectStore
+        self.members = None  # type: ObjectStore
+        self.file_accesses = None  # type: ObjectStore
+        self.stage_tags = None  # type: ObjectStore
+        self.exceptions = None  # type: ObjectStore
+        self.get_value = None  # type: Callable[[any, bool], Optional[str]] | Callable[[any], Optional[str]] 
+        self.partial_save_frequency = None  # type: Optional[float]
+        self.last_partial_save = None  # type: Optional[float]
+        self.first_activation = None  # type: ActivationLW
+        self.last_activation = None  # type: ActivationLW
+        
+        self.reload_metascript(metascript, first=True)
+        
+            
+    def reload_metascript(self, metascript, first=False):
+        self.get_time = metascript.get_time
+        self.code_components = metascript.code_components_store
+        self.evaluations = metascript.evaluations_store
+        self.activations = metascript.activations_store
+        self.dependencies = metascript.dependencies_store
+        self.members = metascript.members_store
+        self.file_accesses = metascript.file_accesses_store
+        self.stage_tags = metascript.stage_tags_store
+        self.exceptions = metascript.exceptions_store
+        
+        from ..metadata import NO_VALUES, RELEVANT_VALUES
+        if self.metascript.collect_values == NO_VALUES:
+            self.get_value = lambda value, is_relevant=False: None
+        elif self.metascript.collect_values == RELEVANT_VALUES:
+            self.get_value = lambda value, is_relevant=False: (
+                metascript.serialize(value) if is_relevant else None
+            )
+        else:  # ALL_VALUES
+            self.get_value = lambda value, is_relevant=False: metascript.serialize(value)
+        
+        # Partial save
+        if metascript.save_frequency:  # milliseconds
+            self.partial_save_frequency = metascript.save_frequency / 1000.0
+    
+        if first:
+            self.last_partial_save = self.get_time()
 
-    def get_value(self, value):
-        #ipdb.set_trace()
-        """Get value representation from value"""
-        repr_fn = repr
-        if type(value) is not type:
-            try:
-                the_repr = object.__getattribute__(value, '__repr__')
-                original_def = getattr(the_repr, 'original_def')
-                repr_fn = original_def
-            except AttributeError:
-                pass
-        return repr_fn(value)
+            self.first_activation = self.activations.dry_add(
+                self.evaluations.dry_add(self.trial_id, -1, -1, None, None),
+                self.trial_id, "<now>", None, None
+            )
+            self.first_activation.depth = 0
+            self.last_activation = self.first_activation
 
     def as_is(self, value):
         """Return value without any processing"""
@@ -421,7 +439,7 @@ class Collector(object):
         """Close activation. Set checkpoint and value"""
         evaluation = activation.evaluation
         evaluation.checkpoint = self.time()
-        evaluation.repr = self.get_value(value)
+        evaluation.repr = self.get_value(value, is_relevant=True)
         evaluation.set_reference(reference)
         self.add_type(evaluation, value)
         self.last_activation = activation.last_activation
@@ -574,7 +592,7 @@ class Collector(object):
         if activation.iscell:
             evaluation = activation.evaluation
             reference = self.find_reference_dependency(value, depa)
-            evaluation.repr = self.get_value(value)
+            evaluation.repr = self.get_value(value, is_relevant=True)
             evaluation.set_reference(reference)
             self.make_dependencies(activation, evaluation, depa)
             if 'Out' not in activation.context:
@@ -1282,9 +1300,11 @@ class Collector(object):
         if activation.active:
             if len(dependency_aware.dependencies) == 1:
                 dependency = dependency_aware.dependencies[0]
+                dependency.evaluation.repr = self.get_value(value, is_relevant=True)
             else:
                 eva = self.evaluate_depa(
-                    activation, code_id, value, self.time(), dependency_aware
+                    activation, code_id, value, self.time(), dependency_aware,
+                    is_relevant=True
                 )
                 dependency = Dependency(eva, value, mode)
             dependency.arg = arg
@@ -1910,7 +1930,7 @@ class Collector(object):
         trial_id = self.trial_id
         tevaluation = self.evaluations.add_object(
             trial_id, self.code_components.add(
-                trial_id, self.get_value(value), 'type', 'w', -1, -1, -1, -1, -1
+                trial_id, self.metascript.serialize(value), 'type', 'w', -1, -1, -1, -1, -1
             ), -1, self.time(), self.get_value(value)
         )
         self.shared_types[value] = tevaluation
@@ -1927,12 +1947,12 @@ class Collector(object):
         )
         return tevaluation
 
-    def evaluate_depa(self, activation, code_id, value, checkpoint, depa=None):
+    def evaluate_depa(self, activation, code_id, value, checkpoint, depa=None, is_relevant=False):
         """Create evaluation for code component"""
         # pylint: disable=too-many-arguments
         reference = self.find_reference_dependency(value, depa)
         evaluation = self.evaluate(
-            activation.id, code_id, value, checkpoint, reference, depa
+            activation.id, code_id, value, checkpoint, reference, depa, is_relevant=is_relevant
         )
         self.make_dependencies(activation, evaluation, depa)
         return evaluation
@@ -1954,13 +1974,13 @@ class Collector(object):
                 '.__class__', evaluation.checkpoint, "Put"
             )
 
-    def evaluate(self, activation_id, code_id, value, checkpoint, reference=None, depa=None):
+    def evaluate(self, activation_id, code_id, value, checkpoint, reference=None, depa=None, is_relevant=False):
         """Create evaluation for code component"""
         # pylint: disable=too-many-arguments
         if checkpoint is None:
             checkpoint = self.time()
         evaluation = self.evaluations.add_object(
-            self.trial_id, code_id, activation_id, checkpoint, self.get_value(value)
+            self.trial_id, code_id, activation_id, checkpoint, self.get_value(value, is_relevant=is_relevant)
         )
         evaluation.set_reference(reference)
         self.add_type(evaluation, value)

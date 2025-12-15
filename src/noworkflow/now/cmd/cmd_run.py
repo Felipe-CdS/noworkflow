@@ -77,6 +77,8 @@ class Run(Command):
     def __init__(self, *args, **kwargs):
         super(Run, self).__init__(*args, **kwargs)
         self.default_context = "main"
+        self.default_serializer = "repr"
+        self.default_collect_values = "all"
         self.default_call_storage_frequency = 10000
         self.default_save_frequency = 0
         self.add_help = False
@@ -108,6 +110,14 @@ class Run(Command):
                 help="depth for capturing function activations (default: "
                      "recursion limit)")
         # ToDo: limit module depth
+        add_arg("-r", "--serializer", choices=["repr", "jsonpickle", "jsonpickle_content", "simple"],
+                default=self.default_serializer,
+                help="serialization method for evaluation values (default: repr)")
+        add_arg("-e", "--collect-values", choices=["none", "relevant", "all"],
+                default=self.default_collect_values,
+                help="R|collect evaluation values (default: all).\n"
+                     "The 'relevant' option makes it collect only values of activations,\n"
+                     "arguments, and tagged evaluations.")
         #   Use context option: main, package, all
         add_arg("-c", "--context", choices=["main", "package", "all"],
                 default=self.default_context,
