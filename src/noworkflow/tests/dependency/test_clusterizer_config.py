@@ -11,6 +11,7 @@ from ...now.models.dependency_graph.config import DependencyConfig
 from ...now.models.dependency_graph.clusterizer import Clusterizer
 from ...now.models.dependency_graph.clusterizer import ActivationClusterizer
 from ...now.models.dependency_graph.clusterizer import DependencyClusterizer
+from ...now.models.dependency_graph.clusterizer import RetrospectiveClusterizer
 from ...now.models.dependency_graph.clusterizer import ProspectiveClusterizer
 from ...now.models.dependency_graph.filters import FilterTypesOut
 from ...now.models.dependency_graph.filters import FilterAccessesOut
@@ -138,9 +139,9 @@ class TestClusterizerConfig(CollectionTestCase):
             type(config.synonymer([SameSynonymer()]))
         )
 
-    def test_mode_simulation(self):
+    def test_mode_fine_grain(self):
         config = DependencyConfig()
-        config.mode = "simulation"
+        config.mode = "fineGrain"
         self.assertEqual(
             Clusterizer,
             type(config.clusterizer(TrialMock()))
@@ -154,18 +155,27 @@ class TestClusterizerConfig(CollectionTestCase):
             type(config.clusterizer(TrialMock()))
         )
 
-    def test_mode_dependency(self):
+    def test_mode_all(self):
         config = DependencyConfig()
-        config.mode = "dependency"
+        config.mode = "all"
         self.assertEqual(
             DependencyClusterizer,
             type(config.clusterizer(TrialMock()))
         )
 
-    def test_mode_prospective(self):
+    def test_mode_coarse_grain(self):
         config = DependencyConfig()
-        config.mode = "prospective"
+        config.mode = "coarseGrain"
+        self.assertEqual(
+            RetrospectiveClusterizer,
+            type(config.clusterizer(TrialMock()))
+        )
+        
+    def test_mode_loopless_coarse_grain(self):
+        config = DependencyConfig()
+        config.mode = "looplessCoarseGrain"
         self.assertEqual(
             ProspectiveClusterizer,
             type(config.clusterizer(TrialMock()))
         )
+
