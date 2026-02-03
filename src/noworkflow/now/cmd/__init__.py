@@ -27,6 +27,7 @@ from .cmd_demo import Demo
 from .cmd_helper import Helper
 from .cmd_history import History
 from .cmd_prov import Prov
+from .cmd_prospective import Prospective
 from .cmd_schema import Schema
 from .cmd_kernel import Kernel
 from .cmd_gc import GC
@@ -61,6 +62,7 @@ def main():
         Helper(),
         History(),
         Prov(),
+        Prospective(),
         Schema(),
         Kernel(),
         GC(),
@@ -100,6 +102,7 @@ __all__ = [
     "Helper",
     "History",
     "Prov",
+    "Prospective",
     "Kernel",
     "GC",
     "main",
